@@ -70,7 +70,7 @@ first_name_text_field.set_text(person.first_name)
 last_name_text_field.set_text(person.last_name)
 ```
 
-If `get_person_from_server` takes some amount of time, you could end up blocking
+If `person_from_server` takes some amount of time, you could end up blocking
 your UI until you get the result.
 
 What if you made a version of your sever client that made requests on another
