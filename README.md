@@ -34,7 +34,7 @@ plus seven: 17
 So, what happened here exactly? We created our intial IOU `iou1`. This is a
 wrapper for some value that might be provided in the future. We then use
 `iou1.add_fulfilled_handler` to say when `iou1` is fulfilled, call the
-function provided with the value the IOU was fulfilled with.
+handler function provided with the value the IOU was fulfilled with.
 
 We then call `iou.add_fulfilled_handler` with a simple lambda that adds 7 to
 whatever value it's called with. In the first call to
@@ -51,35 +51,44 @@ Next, we add a print handler to `plus_seven_iou to` print it's value.
 Finally, we fulfill the original IOU, `iou1` with the value `10`. By doing this,
 we cause the entire chain of IOUs to evaluate.
 
-That was one of the simpler examples. But let's imagine you have code that looks
+Another way to put it would be like this:
+
+1. create `iou1`
+2. make a handler that will print the value `iou1` id fulfilled with
+3. make an IOU (`plus_seven_iou`) that will be fulfilled with the value of `iou1` plus 7
+4. make a handler that will print the value `plus_seven_iou` is fulfilled with
+5. fulfill `iou1` with a value of `10`, causing the chain of fulfilled handlers to get executed
+
+That was maybe a less useful example. But let's imagine you have code that looks
 something like:
 ```python
-value = compute_large_value()
+# Fetch the person object from the server for "ereinecke"
+person = person_from_server("ereinecke")
 
-other_value1 = grab_other_value(value)
-other_value2 = grab_another_value(value)
-
-print("Final values are:", other_value1, other_value2)
+# Push the first and last name for person to UI fields
+first_name_text_field.set_text(person.first_name)
+last_name_text_field.set_text(person.last_name)
 ```
 
-This is pretty simple to do synchronously. The problem is that you are waiting
-for both `other_value1` and `other_value2` to be gotten in order. What if there
-was a way to execute these things as much in parallel as possible?
+If `get_person_from_server` takes some amount of time, you could end up blocking
+your UI until you get the result.
 
-Enter the IOU:
+What if you made a version of your sever client that made requests on another
+thread and then fulfilled IOUs for the requests on the main thread:
 
 ```python
-# IOU-Aware versions of the other fuctions are used
-value_iou = iou_for_computed_large_value()
+# IOU-Aware variant of person_from_server
+person_iou = iou_for_person_from_server("ereinecke")
 
-other_iou1 = value_iou.add_fulfilled_handler(grab_other_value)
-other_iou2 = value_iou.add_fulfilled_handler(grab_another_value)
-
-# Wait for both the IOUs to be fulfilled before printing their values
-other_iou1.wait()
-other_iou2.wait()
-print("Final values are:", other_iou1.value, other_iou2.value)
+# Tell the IOU to set the text fields on completion
+person_iou.add_fulfilled_handler(
+    lambda p:first_name_text_field.set_text(p.first_name))
+person_iou.add_fulfilled_handler(
+    lambda p:last_name_text_field.set_text(p.last_name))
 ```
+
+This allows for the implementation of non-blocking APIs fairly simply. See the
+`iou.httpreactor` sub-module for an example of a non-blocking http request API!
 
 Just like IOUs can be *fulfilled*, they can also be *rejected*. That is to say,
 if there is an error in generating the value to fulfill the IOU with, it will be
