@@ -90,6 +90,7 @@ person_iou.add_fulfilled_handler(
 This allows for the implementation of non-blocking APIs fairly simply. See the
 `iou.httpreactor` sub-module for an example of a non-blocking http request API!
 
+### Rejection
 Just like IOUs can be *fulfilled*, they can also be *rejected*. That is to say,
 if there is an error in generating the value to fulfill the IOU with, it will be
 rejected with the appropriate exception. When this happens, none of the
@@ -98,6 +99,52 @@ called with the exception. Also, the value of the IOU will be set to the
 exception as well. Rejection handlers can be added similarly to fulfilled
 handlers, but using `add_rejected_handler` instead. This method also returns an
 IOU to be fulfilled with the result of the rejected handler.
+
+### Chaining
+There is one special cases in which you'll be given `None` when using 
+`add_fulfilled_handler`. This is when the handler is another IOU. In 
+this case, the handler IOU is *chained* to the IOU you added it to.
+This means that the chained IOU will be settled with the same result
+as the IOU it's a handler for.
+
+Here is an example:
+
+```
+from __future__ import print_function
+from iou import IOU
+iou1 = IOU()
+iou2 = IOU()
+iou2.add_fulfilled_handler(print)
+iou2.add_rejected_handler(lambda e:print("exception:", e))
+iou1.add_fulfilled_handler(iou2)
+iou1.reject(Exception("bad stuff happened"))
+```
+
+When this is run, the output would be:
+
+`exception: bad stuff happened`
+
+Another place where chaining happens is if the handler's *result* is an IOU, when
+this happens, the IOU you were given when you registered the handler is chained
+to the resultant IOU. This facilitates the `then()` behavior of other promise systems.
+
+Here is a theorretical example:
+```python
+con = MyConnectionToServer('database.mycompany.com')
+login_iou = con.login('username', 'password')  # returns an IOU to a session object
+
+# We don't actually use the session object, but want to wait until the connection
+# is established before calling user_for_username
+user_iou = connection_iou.add_fulfilled_handler(
+        lambda _:con.user_for_username('ereinecke'))
+
+# Log the name of the user and delete him
+user_iou.add_fulfilled_handler(lambda user:print("I am deleting:", user.name))
+user_delete_iou = user_iou.add_fulfilled_handler(lambda user:user.delete())
+
+# once the deletion is complete, logout
+user_delete_iou.add_fulfilled_handler(lambda _:con.logout())
+```
 
 There is much more to the implementation of the IOUs, I hope to document this
 in the near future.
