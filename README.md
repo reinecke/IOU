@@ -126,7 +126,9 @@ When this is run, the output would be:
 
 Another place where chaining happens is if the handler's *result* is an IOU, when
 this happens, the IOU you were given when you registered the handler is chained
-to the resultant IOU. This facilitates the `then()` behavior of other promise systems.
+to the resultant IOU. This is to day, the IOU that was returned by the handler
+will also fulfill the IOU you got when you registered the handler. This 
+facilitates the `then()` behavior of other promise systems.
 
 Here is a theorretical example:
 ```python
@@ -145,6 +147,9 @@ user_delete_iou = user_iou.add_fulfilled_handler(lambda user:user.delete())
 # once the deletion is complete, logout
 user_delete_iou.add_fulfilled_handler(lambda _:con.logout())
 ```
+
+What happens when you add an IOU as a rejected handler? Weird stuff. I'm open
+to ideas about what to do here, [let me know!](https://github.com/reinecke/IOU/issues/new)
 
 There is much more to the implementation of the IOUs, I hope to document this
 in the near future.
