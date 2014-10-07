@@ -202,6 +202,19 @@ class IOU(object):
         if self == handler:
             raise TypeError("IOU cannot handle itself")
         
+        # If the handler is an IOU, use chained behavior
+        handler_is_iou = _is_iou(handler)
+        if handler_is_iou and self.is_fulfilled:
+            handler.fulfill(self.value)
+            return
+        elif handler_is_iou and self.is_rejected:
+            handler.reject(self.value)
+            return
+        elif handler_is_iou:
+            _LOG("chaining", handler, "to", self)
+            self._chained_IOUs.append(handler)
+            return
+        
         out_iou = IOU()
         if self.is_fulfilled:
             _resolve(out_iou, handler, self.value)
