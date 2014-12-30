@@ -120,10 +120,17 @@ class IOU(object):
         
     @property
     def is_settled(self):
+        '''Returns whether the IOU has been resolved or not
+
+        is_settled will be True if the IOU has been either rejected or
+        fulfilled, otherwise it will be False.
+        '''
         return self._settled_event and self._settled_event.is_set()
     
     @property
     def is_fulfilled(self):
+        '''Returns whether the IOU is fulfilled or not
+        '''
         if self.is_settled:
             return not self.is_rejected
         
@@ -131,6 +138,8 @@ class IOU(object):
         return None
     
     def _resolve_actors(self, actor_deque, value):
+        '''Handle the actual resolution of a deque of actors
+        '''
         _LOG("resolving", actor_deque, "with", value)
         while actor_deque:
             handler, iou = actor_deque.popleft()
@@ -145,8 +154,7 @@ class IOU(object):
                 _resolve(iou, handler, value)
 
     def _push_result_to(self, other_iou):
-        '''
-        Calls either fulfill or reject on other_iou according to this iou
+        '''Calls either fulfill or reject on other_iou according to this iou
         '''
         if self.is_rejected:
             other_iou.reject(self.value)
@@ -154,6 +162,10 @@ class IOU(object):
             other_iou.fulfill(self.value)
 
     def fulfill(self, value):
+        '''Resolve this IOU by fulfilling it
+
+        value is the value the IOU will be fulfilled with
+        '''
         if self.is_settled:
             raise ValueError("Cannont re-resolve a promise")
         if value == self:
@@ -175,10 +187,15 @@ class IOU(object):
         self._settled_event.set()
 
     def reject(self, reason):
+        '''Resolve this IOU by rejecting it
+
+        reason is the value to reject with (usually an Exception)
+        '''
         if reason == self:
             raise TypeError("IOU reject pay itself")
         if self.is_settled:
-            raise ValueError("Cannot re-resolve %s with value:%s"%(str(self), str(self.value)))
+            raise ValueError("Cannot re-resolve %s with value:%s"%(str(self),
+                str(self.value)))
         
         _LOG("--==rejecting", self)
         self.value = reason
@@ -199,6 +216,12 @@ class IOU(object):
         self._settled_event.set()
     
     def add_fulfilled_handler(self, handler):
+        '''Adds a handler to be called when the IOU is fulfilled
+
+        The handler will be called with the value the IOU was fulfilled with.
+
+        returns an IOU that will be fulfilled with the result of handler
+        '''
         if self == handler:
             raise TypeError("IOU cannot handle itself")
         
@@ -224,6 +247,13 @@ class IOU(object):
         return out_iou
 
     def add_rejected_handler(self, handler):
+        '''Adds a handler to be called when the IOU is rejected
+
+        The handler will be called with the exception that caused the IOU
+        to reject.
+
+        returns an IOU that will be fulfilled with the result of handler
+        '''
         if self == handler:
             raise TypeError("IOU cannot handle itself")
         
@@ -236,10 +266,24 @@ class IOU(object):
         return out_iou
 
     def add_handlers(self, fulfilled_handler, rejected_handler):
-        self.add_fulfilled_handler(fulfilled_handler)
-        self.add_rejected_handler(rejected_handler)
+        '''Adds both a fulfilled and rejected handler in one shot
+
+        returns a tuple (fulfilled_iou, rejected_iou) of ious to be fulfilled
+        with their respective handelers return values
+        '''
+        fulfilled_iou = self.add_fulfilled_handler(fulfilled_handler)
+        rejected_iou = self.add_rejected_handler(rejected_handler)
+
+        return (fulfilled_iou, rejected_iou)
 
     def add_settled_handler(self, handler):
+        '''Adds the provided handler to be called when the IOU is resolved
+        
+        Handler will be called with either the fulfilled value or rejected
+        exception, dependent on how this IOU resolves.
+
+        returns an IOU that will be fulfilled with the result of handler
+        '''
         if self == handler:
             raise TypeError("IOU cannot handle itself")
         
@@ -254,6 +298,8 @@ class IOU(object):
         return out_iou
 
     def wait(self):
+        '''Blocks until the IOU has been resolved
+        '''
         if self.is_settled:
             return self.value
         
